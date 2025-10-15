@@ -8,7 +8,7 @@ app = FastAPI(title="Todo App")
 tasks = {}
 
 @app.post("/add-task") # @app - a decorator  
-def add_task(task:TaskInDb, reponse_model=TaskPublic):
+def add_task(task:TaskInDb, response_model=TaskPublic):
     task_id = str(uuid.uuid4())  # generate a unique task ID
     print(f" New Task ID: {task_id}")
     task_data = {'id': task_id, 'task': task.task, 'status': task.status}
