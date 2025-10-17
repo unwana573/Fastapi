@@ -1,0 +1,1 @@
+select_data_from_customers_query = "select * from customers;"
