@@ -2,16 +2,16 @@ from pydantic import BaseModel
 from enum import Enum 
 from typing import Optional
 
-class Status(Enum):
+class Status(str,Enum):
     PENDING = "pending"
     COMPLETED = "completed"
 
 class TaskBase(BaseModel):
-    task: str
-    status: Optional[Status] = Status.PENDING
+    description: str
+    status: Optional[Status] = "pending"
 
 class TaskInDb(TaskBase):
     user_id: int
 
 class TaskPublic(TaskBase):
-    id: str | None = None
+    id: int | None = None
