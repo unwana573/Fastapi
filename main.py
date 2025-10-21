@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Query, Path, status, HTTPException, Depends
-from schema import TaskPublic, TaskInDb
+from schema import TaskPublic, TaskInDb, UserPublic, UserInDB
 from typing import List, Optional
 import uuid
 from task import app
@@ -25,10 +25,17 @@ import asyncpg
 # 2. The backend verifies the token. 
 # 3. If the token is valid, we allow access to the endpoint , otherwise we return an unauthorised error message
 
+@app.post('/register', response_model=UserPublic)
+async def register_user(user: UserInDB):
+    pass
 
+@app.post('/login', response_model=UserPublic)
+async def login_user(user: UserInDB):
+    pass
 
-@app.post('/register', response_model=)
-
+@app.post('/register', response_model=UserPublic)
+async def register_user(user: UserInDB):
+    pass
 
 @app.post("/add-task", response_model=TaskPublic)
 async def add_task(task: TaskInDb, db:Database = Depends(get_db)):
