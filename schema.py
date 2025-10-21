@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from enum import Enum 
 from typing import Optional
 
@@ -15,3 +15,8 @@ class TaskInDb(TaskBase):
 
 class TaskPublic(TaskBase):
     id: int | None = None
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+

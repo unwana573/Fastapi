@@ -8,16 +8,30 @@ from schema import Status
 from queries import *
 import asyncpg
 
+#register user
+# 1. ask for user details (firstname, lastname, email, password, role)
+# 2. check if user already exists
+# 3. if user does not exist, create the user in the database.
+# 4. if user exists, return error message that email already exists
 
-tasks:dict = {}
+#login
+# 1. give user details (email, password)
+# 2. verify the user details
+# 3. if user details are correct, return a token. 
+# 
+
+#accessing protected endpoints
+# 1. The frontend sends this token in every request they make to the backend.
+# 2. The backend verifies the token. 
+# 3. If the token is valid, we allow access to the endpoint , otherwise we return an unauthorised error message
+
+
+
+@app.post('/register', response_model=)
+
 
 @app.post("/add-task", response_model=TaskPublic)
 async def add_task(task: TaskInDb, db:Database = Depends(get_db)):
-    # add_task = TaskPublic(
-    #     description = new_task.description,
-    #     status = new_task.status.value,
-    #     user_id = new_task.user_id
-    # )
     add_task_query
     values = {
     # "id": task.user_id,    
@@ -98,3 +112,4 @@ async def delete_task(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", reload=True)
+
