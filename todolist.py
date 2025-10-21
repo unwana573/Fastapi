@@ -37,12 +37,12 @@ def query():
     """
     cur.execute(create_task_query)
     connection.commit()
-    # alter_query = """
-    #     ALTER TABLE tasks
-    #     ADD COLUMN status VARCHAR(50) DEFAULT 'pending';
-    # """
-    # cur.execute(alter_query)
-    # connection.commit()
+    alter_query = """
+        ALTER TABLE tasks
+        ADD COLUMN user_id INT;
+    """
+    cur.execute(alter_query)
+    connection.commit()
 
 query()
 
