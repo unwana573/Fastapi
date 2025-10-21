@@ -21,5 +21,13 @@ update_query = """
 
 delete_query = """
             DELETE FROM tasks 
-            WHERE id = :id AND user_id = :user_id 
+            WHERE id = :id AND user_id = :user_id  
         """
+
+check_email_query="SELECT * FROM users WHERE email = :email"
+
+insert_user_query = """
+        INSERT INTO users (first_name, last_name, email, password, role)
+        VALUES (:first_name, :last_name, :email, :password, :role)
+        RETURNING id, first_name, last_name, email, role
+    """

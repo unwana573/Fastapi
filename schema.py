@@ -16,9 +16,6 @@ class TaskInDb(TaskBase):
 class TaskPublic(TaskBase):
     id: int | None = None
 
-class UserCreate(BaseModel):
-    email: EmailStr
-
 class UserRole(str, Enum):
     USER = "user"
     ADMIN = "admin"
@@ -30,7 +27,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str 
-    role: Optional[UserRole] = UserRole.USER
+    role: Optional[UserRole] = "user"
 
 class UserLogin(BaseModel):
     email: EmailStr

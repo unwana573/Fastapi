@@ -9,3 +9,6 @@ database = Database(url=database_url)
 
 def get_db():
     return database
+
+
+

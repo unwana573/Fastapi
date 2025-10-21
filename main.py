@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Query, Path, status, HTTPException, Depends
-from schema import TaskPublic, TaskInDb, UserPublic, UserInDB
+from schema import TaskPublic, TaskInDb, UserLogin, UserCreate, UserPublic
 from typing import List, Optional
 import uuid
 from task import app
@@ -7,6 +7,7 @@ from database import get_db, Database
 from schema import Status
 from queries import *
 import asyncpg
+from sql.create_sql_table import *
 
 #register user
 # 1. ask for user details (firstname, lastname, email, password, role)
@@ -26,15 +27,33 @@ import asyncpg
 # 3. If the token is valid, we allow access to the endpoint , otherwise we return an unauthorised error message
 
 @app.post('/register', response_model=UserPublic)
-async def register_user(user: UserInDB):
-    pass
+async def register_user(user: UserCreate, 
+                        db:Database = Depends(get_db),
+                        ):
+    check_email_query
+    existing_user = await db.fetch_one(query=check_email_query, values={"email": user.email})
+    
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    insert_user_query
+    
+    new_user = await db.fetch_one(
+        query=insert_user_query,
+        values={
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "password": user.password,
+            "role": user.role,
+        },
+    )
+
+    return new_user
+
 
 @app.post('/login', response_model=UserPublic)
-async def login_user(user: UserInDB):
-    pass
-
-@app.post('/register', response_model=UserPublic)
-async def register_user(user: UserInDB):
+async def login_user(user: UserLogin):
     pass
 
 @app.post("/add-task", response_model=TaskPublic)
