@@ -8,6 +8,7 @@ from schema import Status
 from queries import *
 import asyncpg
 from sql.create_sql_table import *
+from passlib.context import CryptContext
 
 #register user
 # 1. ask for user details (firstname, lastname, email, password, role)
@@ -26,17 +27,25 @@ from sql.create_sql_table import *
 # 2. The backend verifies the token. 
 # 3. If the token is valid, we allow access to the endpoint , otherwise we return an unauthorised error message
 
+pwd_context = CryptContext(schemes=['bcrypt'], deprecated=['auto'])
+
+def hash_password(password):
+    hashed_password = pwd_context.hash(password)
+    return hashed_password
+
+def verify_password(password, hashed_password):
+    return pwd_context.verify(password, hashed_password )
+
 @app.post('/register', response_model=UserPublic)
 async def register_user(user: UserCreate, 
                         db:Database = Depends(get_db),
                         ):
-    check_email_query
     existing_user = await db.fetch_one(query=check_email_query, values={"email": user.email})
     
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    insert_user_query
+    password = hash_password(user.password)
     
     new_user = await db.fetch_one(
         query=insert_user_query,
@@ -44,7 +53,7 @@ async def register_user(user: UserCreate,
             "first_name": user.first_name,
             "last_name": user.last_name,
             "email": user.email,
-            "password": user.password,
+            "password": password,
             "role": user.role,
         },
     )
