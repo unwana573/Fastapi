@@ -101,7 +101,6 @@ async def register_user(user: UserCreate,
     )
     return new_user
 
-
 @app.post('/login', response_model=dict)
 async def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db:Database = Depends(get_db)):
     user = await db.fetch_one(query=check_email_query, values={"email": form_data.username})
