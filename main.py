@@ -4,11 +4,14 @@ from typing import List, Optional
 import uuid
 from task import app
 from database import get_db, Database
-from schema import Status
+from schema import Status, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from queries import *
 import asyncpg
 from sql.create_sql_table import *
 from passlib.context import CryptContext
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from fastapi.security import OAuth2PasswordRequestForm
 
 #register user
 # 1. ask for user details (firstname, lastname, email, password, role)
@@ -36,6 +39,12 @@ def hash_password(password):
 def verify_password(password, hashed_password):
     return pwd_context.verify(password, hashed_password )
 
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 @app.post('/register', response_model=UserPublic)
 async def register_user(user: UserCreate, 
                         db:Database = Depends(get_db),
@@ -62,8 +71,18 @@ async def register_user(user: UserCreate,
 
 
 @app.post('/login', response_model=UserPublic)
-async def login_user(user: UserLogin):
-    pass
+async def login_user(user: UserLogin, db:Database = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
+    user = await db.fetch_one(query=login_query, values={"email": form_data.username})
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
+
+    if not verify_password(form_data.password, user["password"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
+
+    access_token = create_access_token(data={"sub": user["email"], "role": user["role"]})
+
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/add-task", response_model=TaskPublic)
 async def add_task(task: TaskInDb, db:Database = Depends(get_db)):

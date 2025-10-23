@@ -31,3 +31,5 @@ insert_user_query = """
         VALUES (:first_name, :last_name, :email, :password, :role)
         RETURNING id, first_name, last_name, email, role
     """
+
+login_query = "SELECT * FROM users WHERE email = :email"
