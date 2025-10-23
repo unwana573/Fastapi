@@ -113,17 +113,30 @@ async def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db:Databa
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+@app.post("/logout")
+async def logout_user(
+    db: Database = Depends(get_db),
+    token: str = Depends(oauth2scheme),
+    current_user: dict = Depends(get_current_user)
+):
+    clear_token_query = "UPDATE users SET token = NULL WHERE id = :id"
+    await db.execute(query=clear_token_query, values={"id": current_user["id"]})
+    return {"message": "Logout successful"}
+
+
     if not verify_password(form_data.password, user["password"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     access_token = create_access_token(data={"sub": user["email"], "role": user["role"]})
+
+    await db.execute(query=update_token_query, values={"token": access_token, "id": user["id"]})
 
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 
 @app.post("/add-task", response_model=TaskPublic)
-async def add_task(task: TaskInDb, db:Database = Depends(get_db)):
+async def add_task(task: TaskInDb, db:Database = Depends(get_db), current_user: dict = Depends(get_current_user),):
     add_task_query
     values = {
     # "id": task.user_id,    
@@ -144,7 +157,7 @@ async def add_task(task: TaskInDb, db:Database = Depends(get_db)):
         raise HTTPException(status_code=400, detail="User already exists")
 
 @app.get("/users/{user_id}/tasks", response_model=List[TaskPublic])
-async def view_task(db:Database = Depends(get_db)):
+async def view_task(db:Database = Depends(get_db), current_user: dict = Depends(get_current_user)):
     query = select_data_from_users_query
     result = await db.fetch_all(query)
     data_result = []
@@ -159,6 +172,7 @@ async def update_user_tasks(
     updated_task: TaskInDb,
     user_id: int = Path(description="User ID"),
     task_id: int = Path(description="Task ID"),
+    current_user: dict = Depends(get_current_user),
     db:Database = Depends(get_db)):
 
     select_user_query
