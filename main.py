@@ -4,15 +4,19 @@ from typing import List, Optional
 import uuid
 from task import app
 from database import get_db, Database
-from schema import Status, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from schema import Status
 from queries import *
 import asyncpg
 from sql.create_sql_table import *
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
+from jose import JWTError, jwt, ExpiredSignatureError
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
+from config import *
 
+
+oauth2scheme = OAuth2PasswordBearer(tokenUrl="/login")
 #register user
 # 1. ask for user details (firstname, lastname, email, password, role)
 # 2. check if user already exists
@@ -30,7 +34,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 # 2. The backend verifies the token. 
 # 3. If the token is valid, we allow access to the endpoint , otherwise we return an unauthorised error message
 
-pwd_context = CryptContext(schemes=['bcrypt'], deprecated=['auto'])
+pwd_context = PasswordHash.recommended()
 
 def hash_password(password):
     hashed_password = pwd_context.hash(password)
@@ -41,9 +45,38 @@ def verify_password(password, hashed_password):
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=int(ACCESS_TOKEN_EXPIRE_MINUTES)))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+async def get_current_user(token:str = Depends(oauth2scheme), db: Database = Depends(get_db)):
+    try:
+        # access_token = token['access_token']
+        access_token = token
+        data = jwt.decode(access_token, SECRET_KEY, ALGORITHM)
+        email = data['sub']
+        existing_user = await db.fetch_one(query=check_email_query, values={"email": email})
+        if not existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return existing_user
+    except ExpiredSignatureError:
+        raise  HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"})
+
+# @app.get("/users/me")
+# async def get_user(token:str, db:Database = Depends(get_db)):
+#     user = await get_current_user(token=token, db=db)
+#     return user
+
+@app.get("/users/me")
+async def get_user(current_user:dict = Depends(get_current_user)):
+    return current_user
 
 @app.post('/register', response_model=UserPublic)
 async def register_user(user: UserCreate, 
@@ -52,7 +85,7 @@ async def register_user(user: UserCreate,
     existing_user = await db.fetch_one(query=check_email_query, values={"email": user.email})
     
     if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email already registered")
     
     password = hash_password(user.password)
     
@@ -63,26 +96,31 @@ async def register_user(user: UserCreate,
             "last_name": user.last_name,
             "email": user.email,
             "password": password,
-            "role": user.role,
+            "role": user.role.value,
         },
     )
-
     return new_user
 
 
-@app.post('/login', response_model=UserPublic)
-async def login_user(user: UserLogin, db:Database = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
-    user = await db.fetch_one(query=login_query, values={"email": form_data.username})
+@app.post('/login', response_model=dict)
+async def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db:Database = Depends(get_db)):
+    user = await db.fetch_one(query=check_email_query, values={"email": form_data.username})
 
     if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     if not verify_password(form_data.password, user["password"]):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email or password")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     access_token = create_access_token(data={"sub": user["email"], "role": user["role"]})
 
     return {"access_token": access_token, "token_type": "bearer"}
+
+
 
 @app.post("/add-task", response_model=TaskPublic)
 async def add_task(task: TaskInDb, db:Database = Depends(get_db)):
@@ -105,7 +143,7 @@ async def add_task(task: TaskInDb, db:Database = Depends(get_db)):
     except asyncpg.exceptions.UniqueViolationError:
         raise HTTPException(status_code=400, detail="User already exists")
 
-@app.get("/view-task/{user_id}", response_model=List[TaskPublic])
+@app.get("/users/{user_id}/tasks", response_model=List[TaskPublic])
 async def view_task(db:Database = Depends(get_db)):
     query = select_data_from_users_query
     result = await db.fetch_all(query)
@@ -116,7 +154,7 @@ async def view_task(db:Database = Depends(get_db)):
         
     return data_result
 
-@app.put("/update-task/{user_id}/{task_id}")
+@app.put("/users/{user_id}/tasks/{task_id}")
 async def update_user_tasks(
     updated_task: TaskInDb,
     user_id: int = Path(description="User ID"),
@@ -142,10 +180,11 @@ async def update_user_tasks(
     }
     # raise HTTPException(status_code=404, detail="Task id not found")
 
-@app.delete("/delete-task/{user_id}/{task_id}")
+@app.delete("/users/{user_id}/tasks/{task_id}")
 async def delete_task(
     user_id: int = Path(description="User ID"), 
     task_id: int = Path(description="Task ID"), 
+    current_user: dict = Depends(get_current_user),
     db:Database = Depends(get_db)):
     try:
         # Execute delete query

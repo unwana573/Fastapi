@@ -24,7 +24,11 @@ delete_query = """
             WHERE id = :id AND user_id = :user_id  
         """
 
-check_email_query="SELECT * FROM users WHERE email = :email"
+check_email_query= """
+        SELECT * 
+        FROM users 
+        WHERE email = :email
+    """
 
 insert_user_query = """
         INSERT INTO users (first_name, last_name, email, password, role)
@@ -32,4 +36,3 @@ insert_user_query = """
         RETURNING id, first_name, last_name, email, role
     """
 
-login_query = "SELECT * FROM users WHERE email = :email"

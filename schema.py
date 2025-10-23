@@ -45,6 +45,3 @@ class UserPublic(BaseModel):
     email: EmailStr
     role: UserRole
 
-SECRET_KEY = "7834uirh483fu48181yvd788234u1238"  
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
