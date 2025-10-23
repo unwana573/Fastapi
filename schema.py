@@ -44,3 +44,7 @@ class UserPublic(BaseModel):
     last_name: str
     email: EmailStr
     role: UserRole
+<<<<<<< HEAD
+=======
+
+>>>>>>> 90d6155b90598530d354a6c2ae703bab222c8226
