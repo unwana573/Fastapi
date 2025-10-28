@@ -1,11 +1,10 @@
-select_data_from_users_query = "select * from tasks;"
+select_data_from_users_query = """select * from tasks;"""
 
 add_task_query = """
     INSERT INTO tasks (user_id, description, status)
     VALUES (:id, :description, :status)
     RETURNING id, description , status
     """
-
 
 select_user_query = """
         SELECT * FROM tasks 
@@ -36,3 +35,14 @@ insert_user_query = """
         RETURNING id, first_name, last_name, email, role
     """
 
+update_token_query = """
+    UPDATE users
+    SET token = :token
+    WHERE id = :id
+    """
+
+clear_token_query = """
+    UPDATE users 
+    SET token = NULL 
+    WHERE id = :id
+    """
