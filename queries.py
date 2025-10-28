@@ -2,7 +2,7 @@ select_data_from_users_query = """select * from tasks;"""
 
 add_task_query = """
     INSERT INTO tasks (user_id, description, status)
-    VALUES (:id, :description, :status)
+    VALUES (:user_id, :description, :status)
     RETURNING id, description , status
     """
 
@@ -35,14 +35,12 @@ insert_user_query = """
         RETURNING id, first_name, last_name, email, role
     """
 
-update_token_query = """
-    UPDATE users
-    SET token = :token
-    WHERE id = :id
+blacklist_token_query = """
+    INSERT INTO blacklist (token)
+    VALUES (:token)
     """
 
-clear_token_query = """
-    UPDATE users 
-    SET token = NULL 
-    WHERE id = :id
-    """
+get_token_query = """
+    SELECT id FROM blacklist
+    WHERE token = :token;
+"""

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from enum import Enum 
-from typing import Optional
+from typing import Optional, List
 
 class Status(str,Enum):
     PENDING = "pending"
@@ -11,7 +11,7 @@ class TaskBase(BaseModel):
     status: Optional[Status] = "pending"
 
 class TaskInDb(TaskBase):
-    user_id: int
+    pass
 
 class TaskPublic(TaskBase):
     id: int | None = None
@@ -45,3 +45,6 @@ class UserPublic(BaseModel):
     email: EmailStr
     role: UserRole
 
+class UserPublicList:
+    data: List[UserPublic]
+    count: int

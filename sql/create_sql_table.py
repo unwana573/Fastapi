@@ -6,8 +6,7 @@ create_users_query = """
         first_name  VARCHAR(100),
         last_name  VARCHAR(100),
         email VARCHAR(255) UNIQUE NOT NULL,
-        password varchar(255) NOT NULL ,
-        token TEXT UNIQUE,
+        password varchar(255) NOT NULL,
         role VARCHAR(50) DEFAULT 'user'
     );
 """
@@ -24,7 +23,7 @@ create_task_query = """
 """
 
 create_token_query = """
-    CREATE TABLE IF NOT EXISTS token (
+    CREATE TABLE IF NOT EXISTS blacklist (
         id bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
         token TEXT
     );
