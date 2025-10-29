@@ -49,9 +49,21 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+async def verify_access_token_validity(token:str, db:Database):
+    value = await db.execute(query=get_token_query, values={'token':token})
+    # if value:
+    return value
+        
 async def get_current_user(token:str = Depends(oauth2scheme), db: Database = Depends(get_db)):
     try:
         # access_token = token['access_token']
+        token_check = await verify_access_token_validity(token, db)
+        if token_check:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         access_token = token
         data = jwt.decode(access_token, SECRET_KEY, ALGORITHM)
         email = data['sub']
@@ -62,7 +74,7 @@ async def get_current_user(token:str = Depends(oauth2scheme), db: Database = Dep
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return existing_user
+        return UserPublic(**existing_user)
     except ExpiredSignatureError:
         raise  HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -75,7 +87,7 @@ async def get_current_user(token:str = Depends(oauth2scheme), db: Database = Dep
 #     return user
 
 @app.get("/users/me")
-async def get_user(current_user:dict = Depends(get_current_user)):
+async def get_user(current_user:UserPublic = Depends(get_current_user)):
     return current_user
 
 @app.post('/register', response_model=UserPublic)
@@ -101,7 +113,6 @@ async def register_user(user: UserCreate,
     )
     return new_user
 
-
 @app.post('/login', response_model=dict)
 async def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db:Database = Depends(get_db)):
     user = await db.fetch_one(query=check_email_query, values={"email": form_data.username})
@@ -112,28 +123,38 @@ async def login_user(form_data: OAuth2PasswordRequestForm = Depends(), db:Databa
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
     if not verify_password(form_data.password, user["password"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     access_token = create_access_token(data={"sub": user["email"], "role": user["role"]})
 
+    # await db.execute(query=update_token_query, values={"token": access_token, "id": user["id"]})
+
     return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/logout")
+async def logout_user(
+    db: Database = Depends(get_db),
+    token: str = Depends(oauth2scheme),
+    current_user: UserPublic = Depends(get_current_user)
+):
+    await db.execute(query=blacklist_token_query, values={"token": token})
+    return {"message": "Logout successful"}
 
 
 
 @app.post("/add-task", response_model=TaskPublic)
-async def add_task(task: TaskInDb, db:Database = Depends(get_db)):
+async def add_task(task: TaskInDb, db:Database = Depends(get_db), 
+                   current_user: UserPublic = Depends(get_current_user),):
     add_task_query
     values = {
     # "id": task.user_id,    
-    "id": task.user_id,
+    "user_id": current_user.id,
     "description": task.description,
     "status": task.status.value
     }
     try:
         new_task = await db.fetch_one(query=add_task_query, values=values)
-        print(new_task)
         add_task = TaskPublic(
             description = new_task["description"],
             status = new_task["status"],
@@ -144,7 +165,8 @@ async def add_task(task: TaskInDb, db:Database = Depends(get_db)):
         raise HTTPException(status_code=400, detail="User already exists")
 
 @app.get("/users/{user_id}/tasks", response_model=List[TaskPublic])
-async def view_task(db:Database = Depends(get_db)):
+async def view_task(db:Database = Depends(get_db), 
+                    current_user: UserPublic = Depends(get_current_user)):
     query = select_data_from_users_query
     result = await db.fetch_all(query)
     data_result = []
@@ -159,6 +181,7 @@ async def update_user_tasks(
     updated_task: TaskInDb,
     user_id: int = Path(description="User ID"),
     task_id: int = Path(description="Task ID"),
+    current_user: UserPublic = Depends(get_current_user),
     db:Database = Depends(get_db)):
 
     select_user_query
@@ -184,7 +207,7 @@ async def update_user_tasks(
 async def delete_task(
     user_id: int = Path(description="User ID"), 
     task_id: int = Path(description="Task ID"), 
-    current_user: dict = Depends(get_current_user),
+    current_user: UserPublic = Depends(get_current_user),
     db:Database = Depends(get_db)):
     try:
         # Execute delete query
