@@ -15,7 +15,7 @@ create_users_query = """
 create_task_query = """
     CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY,
-        description TEXT,
+        task TEXT,
         user_id bigint, 
         status VARCHAR(50) DEFAULT 'pending',
         FOREIGN KEY(user_id) REFERENCES users(id)

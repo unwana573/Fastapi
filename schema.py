@@ -7,7 +7,7 @@ class Status(str,Enum):
     COMPLETED = "completed"
 
 class TaskBase(BaseModel):
-    description: str
+    task: str
     status: Optional[Status] = "pending"
 
 class TaskInDb(TaskBase):
@@ -44,6 +44,7 @@ class UserPublic(BaseModel):
     last_name: str
     email: EmailStr
     role: UserRole
+
 
 class UserPublicList:
     data: List[UserPublic]

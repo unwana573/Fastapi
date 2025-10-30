@@ -1,9 +1,13 @@
-select_data_from_users_query = """select * from tasks;"""
+select_task_query = """SELECT * FROM tasks
+                        WHERE LOWER(status) = :status;
+"""
+select_empty_task_query = """SELECT * from tasks;
+"""
 
 add_task_query = """
-    INSERT INTO tasks (user_id, description, status)
-    VALUES (:user_id, :description, :status)
-    RETURNING id, description , status
+    INSERT INTO tasks (user_id, task, status)
+    VALUES (:user_id, :task, :status)
+    RETURNING id, task , status
     """
 
 select_user_query = """
@@ -13,9 +17,9 @@ select_user_query = """
 
 update_query = """
         UPDATE tasks
-        SET description = :description, status = :status
+        SET task = :task, status = :status
         WHERE id = :id AND user_id = :user_id 
-        RETURNING id, description, status, user_id
+        RETURNING id, task, status, user_id
     """
 
 delete_query = """
@@ -36,11 +40,15 @@ insert_user_query = """
     """
 
 blacklist_token_query = """
-    INSERT INTO blacklist (token)
-    VALUES (:token)
+    INSERT INTO blacklist (tokens)
+    VALUES (:tokens)
     """
 
 get_token_query = """
     SELECT id FROM blacklist
-    WHERE token = :token;
+    WHERE tokens = :tokens;
 """
+
+check_admin_query = """
+    SELECT id, first_name, last_name, email, role
+    FROM users; """

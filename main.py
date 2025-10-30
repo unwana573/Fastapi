@@ -50,7 +50,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def verify_access_token_validity(token:str, db:Database):
-    value = await db.execute(query=get_token_query, values={'token':token})
+    value = await db.execute(query=get_token_query, values={'tokens':token})
     # if value:
     return value
         
@@ -81,13 +81,23 @@ async def get_current_user(token:str = Depends(oauth2scheme), db: Database = Dep
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"})
 
-# @app.get("/users/me")
-# async def get_user(token:str, db:Database = Depends(get_db)):
-#     user = await get_current_user(token=token, db=db)
-#     return user
+@app.get("/admin/users", response_model=List[UserPublic])
+async def get_all_users(
+    db: Database = Depends(get_db),
+    current_user: UserPublic = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied.."
+        )
+    else:
+        users = await db.fetch_all(query=check_admin_query)
+        return users
+
 
 @app.get("/users/me")
-async def get_user(current_user:UserPublic = Depends(get_current_user)):
+async def get_current_user(current_user:UserPublic = Depends(get_current_user)):
     return current_user
 
 @app.post('/register', response_model=UserPublic)
@@ -138,25 +148,25 @@ async def logout_user(
     token: str = Depends(oauth2scheme),
     current_user: UserPublic = Depends(get_current_user)
 ):
-    await db.execute(query=blacklist_token_query, values={"token": token})
+    await db.execute(query=blacklist_token_query, values={"tokens": token})
     return {"message": "Logout successful"}
 
 
 
-@app.post("/add-task", response_model=TaskPublic)
+@app.post("/tasks", response_model=TaskPublic)
 async def add_task(task: TaskInDb, db:Database = Depends(get_db), 
                    current_user: UserPublic = Depends(get_current_user),):
     add_task_query
     values = {
     # "id": task.user_id,    
     "user_id": current_user.id,
-    "description": task.description,
+    "task": task.task,
     "status": task.status.value
     }
     try:
         new_task = await db.fetch_one(query=add_task_query, values=values)
         add_task = TaskPublic(
-            description = new_task["description"],
+            task = new_task["task"],
             status = new_task["status"],
             id = new_task["id"]
     )   
@@ -166,35 +176,46 @@ async def add_task(task: TaskInDb, db:Database = Depends(get_db),
 
 @app.get("/users/{user_id}/tasks", response_model=List[TaskPublic])
 async def view_task(db:Database = Depends(get_db), 
-                    current_user: UserPublic = Depends(get_current_user)):
-    query = select_data_from_users_query
-    result = await db.fetch_all(query)
+                    current_user: UserPublic = Depends(get_current_user),
+                    status: Status = Query(description="")):
+    
+    values ={
+                "status": status
+            }
+    
+    if status == "completed":
+            result = await db.fetch_all(query=select_task_query, values=values)
+    elif status == "pending":
+            result = await db.fetch_all(query=select_task_query, values=values)
+    else:
+       result = await db.fetch_all(query=select_empty_task_query) 
+
     data_result = []
     for data in result:
-        data_result.append(TaskPublic(description=data['description'], status=data["status"], 
+        data_result.append(TaskPublic(task=data['task'], status=data["status"], 
             id=data['id']))
         
     return data_result
 
-@app.put("/users/{user_id}/tasks/{task_id}")
+@app.put("/tasks/{task_id}")
 async def update_user_tasks(
     updated_task: TaskInDb,
-    user_id: int = Path(description="User ID"),
+
     task_id: int = Path(description="Task ID"),
     current_user: UserPublic = Depends(get_current_user),
     db:Database = Depends(get_db)):
 
     select_user_query
-    existing_task = await db.fetch_one(query=select_user_query, values={"id": task_id, "user_id": user_id})
+    existing_task = await db.fetch_one(query=select_user_query, values={"id": task_id, "user_id": current_user.id})
     if not select_user_query:
         raise HTTPException(status_code=404, detail="User id not found")
 
     update_query
     values = {
-        "description": updated_task.description,
+        "task": updated_task.task,
         "status": updated_task.status.value,
         "id": task_id,
-        "user_id": user_id, 
+        "user_id": current_user.id, 
     }
     updated_row = await db.fetch_one(query=update_query, values=values)
     return {
@@ -203,16 +224,16 @@ async def update_user_tasks(
     }
     # raise HTTPException(status_code=404, detail="Task id not found")
 
-@app.delete("/users/{user_id}/tasks/{task_id}")
+@app.delete("/tasks/{task_id}")
 async def delete_task(
-    user_id: int = Path(description="User ID"), 
+ 
     task_id: int = Path(description="Task ID"), 
     current_user: UserPublic = Depends(get_current_user),
     db:Database = Depends(get_db)):
     try:
         # Execute delete query
         delete_query
-        rows_affected = await db.execute(query=delete_query, values={"id": task_id, "user_id": user_id})
+        rows_affected = await db.execute(query=delete_query, values={"id": task_id, "user_id": current_user.id})
 
         # ✅ Check if any row was deleted
         if rows_affected == 0:
