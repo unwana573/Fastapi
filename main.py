@@ -1,10 +1,9 @@
 from fastapi import FastAPI, Query, Path, status, HTTPException, Depends
-from schema import TaskPublic, TaskInDb, UserLogin, UserCreate, UserPublic
+from schema import TaskPublic, TaskInDb, UserLogin, UserCreate, UserPublic, UserPublicList, TokenData
 from typing import List, Optional
 import uuid
 from task import app
 from database import get_db, Database
-from schema import Status
 from queries import *
 import asyncpg
 from sql.create_sql_table import *
@@ -14,7 +13,6 @@ from jose import JWTError, jwt, ExpiredSignatureError
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.security import OAuth2PasswordBearer
 from config import *
-
 
 oauth2scheme = OAuth2PasswordBearer(tokenUrl="/login")
 #register user
@@ -53,7 +51,7 @@ async def verify_access_token_validity(token:str, db:Database):
     value = await db.execute(query=get_token_query, values={'token':token})
     # if value:
     return value
-        
+
 async def get_current_user(token:str = Depends(oauth2scheme), db: Database = Depends(get_db)):
     try:
         # access_token = token['access_token']
@@ -80,6 +78,14 @@ async def get_current_user(token:str = Depends(oauth2scheme), db: Database = Dep
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"})
+
+async def require_admin(current_user: TokenData = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admins only!",
+        )
+    return current_user
 
 # @app.get("/users/me")
 # async def get_user(token:str, db:Database = Depends(get_db)):
@@ -141,11 +147,19 @@ async def logout_user(
     await db.execute(query=blacklist_token_query, values={"token": token})
     return {"message": "Logout successful"}
 
-
+@app.get("/users", response_model=UserPublicList)
+async def get_all_users(db: Database = Depends(get_db),
+                        current_user: TokenData = Depends(require_admin)):
+    users = await db.fetch_all(query=get_all_users_query)
+    user_list = [dict(user) for user in users]  
+    return {
+        "data": user_list,
+        "count": len(user_list)
+    }
 
 @app.post("/add-task", response_model=TaskPublic)
 async def add_task(task: TaskInDb, db:Database = Depends(get_db), 
-                   current_user: UserPublic = Depends(get_current_user),):
+                    current_user: UserPublic = Depends(get_current_user),):
     add_task_query
     values = {
     # "id": task.user_id,    
@@ -222,8 +236,6 @@ async def delete_task(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
-
-
 
 if __name__ == "__main__":
     import uvicorn

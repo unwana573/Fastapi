@@ -45,6 +45,11 @@ class UserPublic(BaseModel):
     email: EmailStr
     role: UserRole
 
-class UserPublicList:
+class UserPublicList(BaseModel):
     data: List[UserPublic]
     count: int
+
+class TokenData(BaseModel):
+    id: int
+    email: str
+    role: str

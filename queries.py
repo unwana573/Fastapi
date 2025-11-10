@@ -44,3 +44,8 @@ get_token_query = """
     SELECT id FROM blacklist
     WHERE token = :token;
 """
+
+get_all_users_query = """
+    SELECT id, first_name, last_name, email, role 
+    FROM users;
+    """
